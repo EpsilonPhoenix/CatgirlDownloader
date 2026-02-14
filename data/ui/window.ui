@@ -25,6 +25,32 @@
                 <property name="valign">center</property>
                 <child>
                   <object class="GtkLabel">
+                    <property name="label" translatable="yes">Resolution</property>
+                  </object>
+                </child>
+                <child>
+                  <object class="GtkComboBoxText" id="resolution_combo">
+                    <property name="valign">center</property>
+                  </object>
+                </child>
+                <child>
+                  <object class="GtkLabel">
+                    <property name="label" translatable="yes">Scale</property>
+                  </object>
+                </child>
+                <child>
+                  <object class="GtkSpinButton" id="scale_spin">
+                    <property name="valign">center</property>
+                  </object>
+                </child>
+              </object>
+            </child>
+            <child type="start">
+              <object class="GtkBox">
+                <property name="spacing">8</property>
+                <property name="valign">center</property>
+                <child>
+                  <object class="GtkLabel">
                     <property name="label" translatable="yes">Auto reload</property>
                   </object>
                 </child>

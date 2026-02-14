@@ -32,6 +32,8 @@ class CatgirldownloaderWindow(Adw.ApplicationWindow):
     image = Gtk.Template.Child("image")
     save_button = Gtk.Template.Child("savebutton")
     auto_reload_switch = Gtk.Template.Child("auto_reload_switch")
+    resolution_combo = Gtk.Template.Child("resolution_combo")
+    scale_spin = Gtk.Template.Child("scale_spin")
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -40,6 +42,8 @@ class CatgirldownloaderWindow(Adw.ApplicationWindow):
         self.info = None
         self.imagecontent = None
         self.image_extension = None
+        self.original_pixbuf = None
+        self.processed_pixbuf = None
 
         self._is_loading = False
         self._auto_reload_timeout_id = None
@@ -49,9 +53,101 @@ class CatgirldownloaderWindow(Adw.ApplicationWindow):
         self.auto_reload_switch.set_active(enabled)
         self.auto_reload_switch.connect("notify::active", self.on_auto_reload_toggle)
 
+        self._setup_resolution_controls()
+
         self.refresh_button.connect("clicked", self.async_reloadimage)
         self.save_button.connect("clicked", self.file_chooser_dialog)
         self.async_reloadimage()
+
+    def _setup_resolution_controls(self):
+        self.resolution_combo.append("original", "Original")
+        self.resolution_combo.append("1280x720", "1280x720")
+        self.resolution_combo.append("1920x1080", "1920x1080")
+        self.resolution_combo.append("2560x1440", "2560x1440")
+        self.resolution_combo.append("3840x2160", "3840x2160")
+        self.resolution_combo.set_active_id("original")
+        self.resolution_combo.connect("changed", self.on_resolution_changed)
+
+        scale_adjustment = Gtk.Adjustment(
+            value=1.0,
+            lower=0.5,
+            upper=8.0,
+            step_increment=0.1,
+            page_increment=0.5,
+        )
+        self.scale_spin.set_adjustment(scale_adjustment)
+        self.scale_spin.set_digits(1)
+        self.scale_spin.set_value(1.0)
+        self.scale_spin.connect("value-changed", self.on_scale_changed)
+
+    def on_resolution_changed(self, _combo):
+        self._refresh_scaled_preview()
+
+    def on_scale_changed(self, _spin):
+        self._refresh_scaled_preview()
+
+    def _get_selected_resolution(self):
+        value = self.resolution_combo.get_active_id()
+        if not value or value == "original":
+            return None
+        if "x" not in value:
+            return None
+        try:
+            width, height = value.split("x", 1)
+            width = int(width)
+            height = int(height)
+            if width > 0 and height > 0:
+                return width, height
+        except Exception:
+            return None
+        return None
+
+    def _get_scale_factor(self) -> float:
+        try:
+            scale = float(self.scale_spin.get_value())
+        except Exception:
+            return 1.0
+        if scale < 0.1:
+            return 0.1
+        return scale
+
+    def _has_transform(self) -> bool:
+        resolution = self._get_selected_resolution()
+        scale = self._get_scale_factor()
+        return resolution is not None or abs(scale - 1.0) > 0.001
+
+    def _build_processed_pixbuf(self, pixbuf):
+        if pixbuf is None:
+            return None
+
+        base_width = pixbuf.get_width()
+        base_height = pixbuf.get_height()
+
+        target = self._get_selected_resolution()
+        if target is not None:
+            target_width, target_height = target
+        else:
+            target_width, target_height = base_width, base_height
+
+        scale = self._get_scale_factor()
+        target_width = max(1, int(round(target_width * scale)))
+        target_height = max(1, int(round(target_height * scale)))
+
+        if target_width == base_width and target_height == base_height:
+            return pixbuf
+
+        return pixbuf.scale_simple(target_width, target_height, GdkPixbuf.InterpType.BILINEAR)
+
+    def _refresh_scaled_preview(self):
+        if self.original_pixbuf is None:
+            return
+        try:
+            self.processed_pixbuf = self._build_processed_pixbuf(self.original_pixbuf)
+            if self.processed_pixbuf is not None:
+                self.image.set_pixbuf(self.processed_pixbuf)
+                self.image.set_visible(True)
+        except Exception as e:
+            print(e)
 
     def _get_auto_reload_enabled(self) -> bool:
         enabled = self.settings.get_preference("auto_reload_enabled")
@@ -159,8 +255,8 @@ class CatgirldownloaderWindow(Adw.ApplicationWindow):
                     self.image_extension = image_format.extensions[0]
                 loader.close()
 
-                self.image.set_pixbuf(loader.get_pixbuf())
-                self.image.set_visible(True)
+                self.original_pixbuf = loader.get_pixbuf()
+                self._refresh_scaled_preview()
         except Exception as e:
             print(e)
         finally:
@@ -205,7 +301,17 @@ class CatgirldownloaderWindow(Adw.ApplicationWindow):
         if response_id == Gtk.ResponseType.OK:
             file = dialog.get_file()
             filename = file.get_path()
-            if self.imagecontent:
+            if self.imagecontent and self._has_transform() and self.processed_pixbuf is not None:
+                format_name = (self.image_extension or "png").lower()
+                if format_name == "jpg":
+                    format_name = "jpeg"
+                try:
+                    self.processed_pixbuf.savev(filename, format_name, [], [])
+                except Exception:
+                    f = open(filename, "wb+")
+                    f.write(self.imagecontent)
+                    f.close()
+            elif self.imagecontent:
                 f = open(filename, "wb+")
                 f.write(self.imagecontent)
                 f.close()
