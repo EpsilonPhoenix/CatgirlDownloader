@@ -14,10 +14,11 @@ endif
 
 appstream_file = i18n.merge_file(
         input: 'moe.nyarchlinux.catgirldownloader.appdata.xml.in',
-       output: 'moe.nyarchlinux.catgirldownloader.appdata.xml',
+       output: 'moe.nyarchlinux.catgirldownloader.metainfo.xml',
+         type: 'xml',
        po_dir: '../po',
       install: true,
-  install_dir: join_paths(get_option('datadir'), 'appdata')
+  install_dir: join_paths(get_option('datadir'), 'metainfo')
 )
 
 appstream_util = find_program('appstream-util', required: false)
