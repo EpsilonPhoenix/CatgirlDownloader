@@ -12,7 +12,5 @@
     <p>A very useful program to download catgirl images.</p>
   </description>
 
-  <launchable type="desktop-id">
-    moe.nyarchlinux.catgirldownloader.desktop
-  </launchable>
+  <launchable type="desktop-id">moe.nyarchlinux.catgirldownloader.desktop</launchable>
 </component>
